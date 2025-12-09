@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Scanner</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f3f3f3;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+    }
+    #reader {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    button {
+        padding: 12px 20px;
+        margin: 10px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    #torchBtn { background: #ff9800; color: #fff; }
+    #pauseBtn { background: #f44336; color: #fff; }
+    #resumeBtn { background: #4caf50; color: #fff; display: none; }
+</style>
+
+<!-- html5-qrcode CDN -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+
+<body>
+<h2>QR Code Scanner</h2>
+
+<div id="reader"></div>
+
+<button id="torchBtn">Toggle Torch</button>
+<button id="pauseBtn">Pause Camera</button>
+<button id="resumeBtn">Resume</button>
+
+<script>
+let html5QrCode = null;
+let currentCameraId = null;
+let cameraRunning = false;
+let torchEnabled = false;
+let track = null;
+
+const config = {
+    fps: 10,
+    qrbox: 250,
+    experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+    }
+};
+
+async function startCamera() {
+    html5QrCode = new Html5Qrcode("reader");
+
+    try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices.length === 0) {
+            alert("No camera found");
+            return;
+        }
+
+        currentCameraId = devices[0].id;
+
+        await html5QrCode.start(
+            { deviceId: { exact: currentCameraId } },
+            config,
+            onScanSuccess
+        );
+
+        // Dapatkan video track kamera
+        const stream = html5QrCode.getStateManager().stream;
+        if (stream) {
+            track = stream.getVideoTracks()[0];
+        }
+
+        cameraRunning = true;
+
+    } catch (err) {
+        console.error(err);
+        alert("Cannot start camera: " + err);
+    }
+}
+
+// Callback ketika QR berhasil di-scan
+function onScanSuccess(decodedText) {
+    console.log("QR:", decodedText);
+
+    // Auto redirect
+    window.location.href = decodedText;
+}
+
+// Tombol Torch ---------------------------------------------------
+document.getElementById("torchBtn").onclick = () => {
+    if (!track) return alert("Torch not supported");
+
+    const capabilities = track.getCapabilities();
+    if (!capabilities.torch) {
+        alert("Torch not supported on this device");
+        return;
+    }
+
+    torchEnabled = !torchEnabled;
+    track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+};
+
+// Tombol Pause ---------------------------------------------------
+document.getElementById("pauseBtn").onclick = () => {
+    if (!cameraRunning) return;
+
+    html5QrCode.stop().then(() => {
+        cameraRunning = false;
+        document.getElementById("pauseBtn").style.display = "none";
+        document.getElementById("resumeBtn").style.display = "inline-block";
+        console.log("Camera stopped");
+    });
+};
+
+// Tombol Resume --------------------------------------------------
+document.getElementById("resumeBtn").onclick = () => {
+    startCamera().then(() => {
+        document.getElementById("pauseBtn").style.display = "inline-block";
+        document.getElementById("resumeBtn").style.display = "none";
+        console.log("Camera resumed");
+    });
+};
+
+// Start camera saat halaman dibuka
+startCamera();
+</script>
+
+</body>
+</html>
